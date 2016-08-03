@@ -88,6 +88,7 @@ if ( ! class_exists( 'Stripe_Checkout_Functions' ) ) {
 
 				// Get the credit card details submitted by the form
 				$token             = $_POST['stripeToken'];
+				$plan_id           = $_POST['sc-plan-id'];
 				$amount            = $_POST['sc-amount'];
 				$description       = $_POST['sc-description'];
 				$store_name        = $_POST['sc-name'];
@@ -103,33 +104,50 @@ if ( ! class_exists( 'Stripe_Checkout_Functions' ) ) {
 
 				Stripe_Checkout_Functions::set_key( $test_mode );
 
-				// Create new customer
-				$new_customer = \Stripe\Customer::create( array(
-					'email' => $_POST['stripeEmail'],
-					'card'  => $token,
-				));
-
 				// Create the charge on Stripe's servers - this will charge the user's default card
 				try {
-					$charge = \Stripe\Charge::create( array(
-							'amount'      => $amount, // amount in cents, again
-							'currency'    => $currency,
-							'customer'    => $new_customer['id'],
-							'description' => $description,
-							'metadata'    => $meta,
-						)
+
+					// From https://developer.wordpress.org/reference/functions/add_query_arg/:
+					// Values are expected to be encoded appropriately with urlencode() or rawurlencode().
+					$query_args = array(
+						'store_name' => rawurlencode( $store_name )
 					);
+
+					if ( $plan_id ) {
+						// Create new customer and assign to the plan
+						$new_customer = \Stripe\Customer::create( array(
+							'email'   => $_POST['stripeEmail'],
+							'source'  => $token,
+							'plan'    => $plan_id
+						));
+
+						$charges = $new_customer->charges(array('limit'  => 1));
+						if (count($charges->data))
+							$charge = $charges->data[0];
+
+						$query_args['plan_id'] = $plan_id;
+					} else {
+						// Create new customer
+						$new_customer = \Stripe\Customer::create( array(
+							'email' => $_POST['stripeEmail'],
+							'card'  => $token,
+						));
+
+						$charge = \Stripe\Charge::create( array(
+								'amount'      => $amount, // amount in cents, again
+								'currency'    => $currency,
+								'customer'    => $new_customer['id'],
+								'description' => $description,
+								'metadata'    => $meta,
+							)
+						);
+					}
 
 					// Fires immediately after Stripe charge object created.
 					do_action( 'simpay_charge_created', $charge );
 
 					// Add Stripe charge ID to querystring.
-					// From https://developer.wordpress.org/reference/functions/add_query_arg/:
-					// Values are expected to be encoded appropriately with urlencode() or rawurlencode().
-					$query_args = array(
-						'charge'     => $charge->id,
-						'store_name' => rawurlencode( $store_name ),
-					);
+					$query_args['charge'] = $charge->id;
 
 					$failed = false;
 					

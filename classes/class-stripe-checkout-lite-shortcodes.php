@@ -39,6 +39,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 		   $attr = shortcode_atts( array(
 						   'name'                      => ( null !== $sc_options->get_setting_value( 'name' ) ? $sc_options->get_setting_value( 'name' ) : get_bloginfo( 'title' ) ),
 						   'description'               => '',
+						   'plan_id'                   => '',
 						   'amount'                    => '',
 						   'image_url'                 => ( null !== $sc_options->get_setting_value( 'image_url' ) ? $sc_options->get_setting_value( 'image_url' ) : '' ),
 						   'currency'                  => ( null !== $sc_options->get_setting_value( 'currency' ) ? $sc_options->get_setting_value( 'currency' ) : 'USD' ),
@@ -66,6 +67,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 		   // Assign variables since we are not using extract
 		   $name                      = $attr['name'];
 		   $description               = $attr['description'];
+		   $plan_id                   = $attr['plan_id'];
 		   $amount                    = $attr['amount'];
 		   $image_url                 = $attr['image_url'];
 		   $currency                  = $attr['currency'];
@@ -155,6 +157,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 
 		   $html .= '<input type="hidden" name="sc-name" value="' . esc_attr( $name ) . '" />';
 		   $html .= '<input type="hidden" name="sc-description" value="' . esc_attr( $description ) . '" />';
+		   $html .= '<input type="hidden" name="sc-plan-id" value="' . esc_attr( $plan_id ) . '" />';
 		   $html .= '<input type="hidden" name="sc-amount" class="sc_amount" value="' . esc_attr( $amount ) . '" />';
 		   $html .= '<input type="hidden" name="sc-redirect" value="' . esc_attr( ( ! empty( $success_redirect_url ) ? $success_redirect_url : get_permalink() ) ) . '" />';
 		   $html .= '<input type="hidden" name="sc-redirect-fail" value="' . esc_attr( ( ! empty( $failure_redirect_url ) ? $failure_redirect_url : get_permalink() ) ) . '" />';
