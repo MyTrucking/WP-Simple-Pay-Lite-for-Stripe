@@ -41,6 +41,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 						   'description'               => '',
 						   'plan_id'                   => '',
 						   'amount'                    => '',
+						   'custom_amount'             => 'false',
 						   'image_url'                 => ( null !== $sc_options->get_setting_value( 'image_url' ) ? $sc_options->get_setting_value( 'image_url' ) : '' ),
 						   'currency'                  => ( null !== $sc_options->get_setting_value( 'currency' ) ? $sc_options->get_setting_value( 'currency' ) : 'USD' ),
 						   'checkout_button_label'     => ( null !== $sc_options->get_setting_value( 'checkout_button_label' ) ? $sc_options->get_setting_value( 'checkout_button_label' ) : '' ),
@@ -69,6 +70,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 		   $description               = $attr['description'];
 		   $plan_id                   = $attr['plan_id'];
 		   $amount                    = $attr['amount'];
+		   $custom_amount             = $attr['custom_amount'];
 		   $image_url                 = $attr['image_url'];
 		   $currency                  = $attr['currency'];
 		   $checkout_button_label     = $attr['checkout_button_label'];
@@ -135,25 +137,102 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 		   // Add filter for adding html before payment button.
 		   $html .= apply_filters( 'sc_before_payment_button', '' );
 		   
-		   $html .= '<script
-					   src="https://checkout.stripe.com/checkout.js" class="stripe-button"
-					   data-key="' . esc_js( $data_key ) . '" ' .
-					   ( ! empty( $image_url ) ? 'data-image="' . esc_js( $image_url ) . '" ' : '' ) .
-					   ( ! empty( $name ) ? 'data-name="' . esc_js( $name ) . '" ' : '' ) .
-					   ( ! empty( $description ) ? 'data-description="' . esc_js( $description ) . '" ' : '' ) .
-					   ( ! empty( $amount ) ? 'data-amount="' . esc_js( $amount ) . '" ' : '' ) .
-					   ( ! empty( $currency ) ? 'data-currency="' . esc_js( $currency ) . '" ' : '' ) .
-					   ( ! empty( $checkout_button_label ) ? 'data-panel-label="' . esc_js( $checkout_button_label ) . '" ' : '' ) .
-					   ( ! empty( $verify_zip ) ? 'data-zip-code="' . $verify_zip . '" ' : '' ) .
-					   ( ! empty( $prefill_email ) && 'false' != $prefill_email ? 'data-email="' . $prefill_email . '" ' : '' ) .
-					   ( ! empty( $payment_button_label ) ? 'data-label="' . esc_js( $payment_button_label ) . '" ' : '' ) .
-					   ( ! empty( $enable_remember ) ? 'data-allow-remember-me="' . $enable_remember . '" ' : '' ) .
-					   ( ! empty( $bitcoin ) ? 'data-bitcoin="' . $bitcoin . '" ' : '' ) .
-					   ( ! empty( $billing ) ? 'data-billing-address="' . $billing . '" ' : '' ) .
-					   ( ! empty( $alipay ) ? 'data-alipay="' . $alipay . '" ' : '' ) .
-					   ( ( ! empty( $alipay_reusable ) && ( 'true' === $alipay ) ) ? 'data-alipay-reusable="' . $alipay_reusable . '" ' : '' ) . // Omit Alipay reusable if Alipay not enabled.
-					   ( ! empty( $locale ) ? 'data-locale="' . $locale . '" ' : '' ) .
-					   '></script>';
+		   if ( 'true' === $custom_amount ) {
+			   $html .= '<script src="https://checkout.stripe.com/checkout.js"></script>';
+			   $html .= "<script>
+						   (function( $ ){
+							   'use strict';
+
+							   $(function() {
+								   var handler,
+									   form = $('#" . esc_attr( $form_id ) . "'),
+									   button = form.find('.sc_custom_payment_button'),
+									   input = form.find('.sc_custom_amount'),
+									   amount = form.find('.sc_amount');
+
+								   handler = StripeCheckout.configure({
+									   key: '" . esc_js( $data_key ) . "',
+									   image: '" . esc_js( $image_url ) . "',
+									   name: '" . esc_js( $name ) . "',
+									   description: '" . esc_js( $description ) . "',
+									   currency: '" . esc_js( $currency ) . "',
+									   panelLabel: '" . esc_js( $checkout_button_label ) . "',
+									   zipCode: '" . $verify_zip . "',
+									   email: '" . $prefill_email . "',
+									   allowRememberMe: '" . $enable_remember . "',
+									   bitcoin: '" . $bitcoin . "',
+									   billingAddress: '" . $billing . "',
+									   alipay: '" . $alipay . "',";
+
+			   if ( 'true' === $alipay ) {
+				   $html .= "
+									   alipayReusable: '" . $alipay_reusable . "',";
+			   }
+
+			   $html .= "
+									   locale: 'auto',
+									   token: function( token ) {
+										   form
+											   .append( $('<input />', {
+												   type: 'hidden',
+												   name: 'stripeToken',
+												   value: token.id
+											   }) )
+											   .append( $('<input />', {
+												   type: 'hidden',
+												   name: 'stripeEmail',
+												   value: token.email
+											   }) )
+											   .submit();
+									   }
+								   });
+
+								   button.on( 'click', function() {
+									   var customAmount = input.val();
+
+									   customAmount = customAmount.replace( /,/g, '' );
+									   customAmount = parseFloat( customAmount );
+
+									   if ( isNaN( customAmount ) ) {
+										   return;
+									   }
+
+									   customAmount = Math.round( customAmount * 100 );
+
+									   amount.val(customAmount);
+									   handler.open({ amount: customAmount });
+								   });
+							   });
+						   })( jQuery );
+						   </script>";
+		   } else {
+			   $html .= '<script
+						   src="https://checkout.stripe.com/checkout.js" class="stripe-button"
+						   data-key="' . esc_js( $data_key ) . '" ' .
+						   ( ! empty( $image_url ) ? 'data-image="' . esc_js( $image_url ) . '" ' : '' ) .
+						   ( ! empty( $name ) ? 'data-name="' . esc_js( $name ) . '" ' : '' ) .
+						   ( ! empty( $description ) ? 'data-description="' . esc_js( $description ) . '" ' : '' ) .
+						   ( ! empty( $amount ) ? 'data-amount="' . esc_js( $amount ) . '" ' : '' ) .
+						   ( ! empty( $currency ) ? 'data-currency="' . esc_js( $currency ) . '" ' : '' ) .
+						   ( ! empty( $checkout_button_label ) ? 'data-panel-label="' . esc_js( $checkout_button_label ) . '" ' : '' ) .
+						   ( ! empty( $verify_zip ) ? 'data-zip-code="' . $verify_zip . '" ' : '' ) .
+						   ( ! empty( $prefill_email ) && 'false' != $prefill_email ? 'data-email="' . $prefill_email . '" ' : '' ) .
+						   ( ! empty( $payment_button_label ) ? 'data-label="' . esc_js( $payment_button_label ) . '" ' : '' ) .
+						   ( ! empty( $enable_remember ) ? 'data-allow-remember-me="' . $enable_remember . '" ' : '' ) .
+						   ( ! empty( $bitcoin ) ? 'data-bitcoin="' . $bitcoin . '" ' : '' ) .
+						   ( ! empty( $billing ) ? 'data-billing-address="' . $billing . '" ' : '' ) .
+						   ( ! empty( $alipay ) ? 'data-alipay="' . $alipay . '" ' : '' ) .
+						   ( ( ! empty( $alipay_reusable ) && ( 'true' === $alipay ) ) ? 'data-alipay-reusable="' . $alipay_reusable . '" ' : '' ) . // Omit Alipay reusable if Alipay not enabled.
+						   ( ! empty( $locale ) ? 'data-locale="' . $locale . '" ' : '' ) .
+						   '></script>';
+		   }
+
+		   if ( 'true' === $custom_amount ) {
+			   $html .= '<div class="sc_custom_payment">';
+			   $html .= '<div class="sc_input"><input type="text" name="sc-custom-amount" class="sc_custom_amount" size="8" /></div>';
+			   $html .= '<button class="stripe-button-el sc_custom_payment_button" type="button"><span>' . $payment_button_label . '</span></button>';
+			   $html .= '</div>';
+		   }
 
 		   $html .= '<input type="hidden" name="sc-name" value="' . esc_attr( $name ) . '" />';
 		   $html .= '<input type="hidden" name="sc-description" value="' . esc_attr( $description ) . '" />';
@@ -175,7 +254,7 @@ if ( ! class_exists( 'Stripe_Checkout_Shortcodes' ) ) {
 		   //Stripe minimum amount allowed.
 		   $stripe_minimum_amount = 50;
 
-		   if ( ( empty( $amount ) || $amount < $stripe_minimum_amount ) || ! isset( $amount ) ) {
+		   if ( 'false' === $custom_amount && ( ( empty( $amount ) || $amount < $stripe_minimum_amount ) || ! isset( $amount ) ) ) {
 			   
 			   if ( current_user_can( 'manage_options' ) ) {
 				   
